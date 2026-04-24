@@ -15,10 +15,14 @@
 <script>
     const config = {
         type: Phaser.AUTO,
-        width: 1280, // Resolución fija para que no se deforme
+        width: 1280, 
         height: 720,
         backgroundColor: '#000',
         parent: 'game-container',
+        scale: {
+            mode: Phaser.Scale.FIT,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        },
         physics: {
             default: 'arcade',
             arcade: { gravity: { y: 0 }, debug: false }
@@ -35,21 +39,20 @@
 
     function preload() {
         // --- ESCENARIO ---
-        this.load.image('bg', 'escenario_parque.png'); // Asegurate que se llame así
+        this.load.image('bg', 'escenario_parque.png');
         this.load.image('fight_logo', 'cartel_fight.png');
         
-        // --- PERSONAJES (Mordecai) ---
+        // --- PERSONAJES (Nombres corregidos de tu repo) ---
         this.load.image('morde_pose', 'mordecai_pose.png');
-        this.load.image('morde_ataque', 'mordecai_ataque_1.png'); // Revisar nombre
+        this.load.image('morde_ataque', 'mordecai_ataque.png'); 
         this.load.image('morde_ataque_fuerte', 'mordecai_ataque_fuerte.png');
         this.load.image('morde_dolor', 'mordecai_dolor.png');
         
-        // --- PERSONAJES (Rigby) ---
         this.load.image('rigby_pose', 'rigby_pose.png');
-        this.load.image('rigby_ataque', 'rigby_ataque_1.png'); // Revisar nombre
+        this.load.image('rigby_ataque', 'rigby_ataque.png'); 
         this.load.image('rigby_dolor', 'rigby_dolor.png');
 
-        // --- SONIDOS (Bajamos el volumen como pediste) ---
+        // --- SONIDOS ---
         this.load.audio('fight_snd', 'sonido_fight.mp3');
         this.load.audio('hit_snd', 'golpe.mp3');
         this.load.audio('hit_fuerte_snd', 'golpe_fuerte.mp3');
@@ -61,7 +64,7 @@
     }
 
     function create() {
-        // Fondo centrado
+        // Fondo ajustado al tamaño del juego
         this.add.image(640, 360, 'bg').setDisplaySize(1280, 720);
 
         // Audios
@@ -70,25 +73,25 @@
         sfxHitFuerte = this.sound.add('hit_fuerte_snd', { volume: 0.4 });
         sfxWin = this.sound.add('win_snd', { volume: 0.6 });
 
-        // Mordecai
-        morde = this.physics.add.sprite(300, 500, 'morde_pose').setScale(1.5);
+        // Mordecai - Bajamos escala para que no sea gigante
+        morde = this.physics.add.sprite(300, 550, 'morde_pose').setScale(0.8);
         morde.setCollideWorldBounds(true);
         
-        // Rigby
-        rigby = this.physics.add.sprite(980, 500, 'rigby_pose').setScale(1.2);
+        // Rigby - Bajamos escala
+        rigby = this.physics.add.sprite(980, 580, 'rigby_pose').setScale(0.7);
         rigby.setCollideWorldBounds(true).setFlipX(true);
 
-        // Barras de Vida (Simples)
-        this.add.rectangle(300, 50, 400, 30, 0x333333); // Fondo barra
-        this.add.rectangle(980, 50, 400, 30, 0x333333);
-        mordeHpBar = this.add.rectangle(300, 50, 400, 30, 0x00ff00);
-        rigbyHpBar = this.add.rectangle(980, 50, 400, 30, 0x00ff00);
+        // Barras de Vida ajustadas
+        this.add.rectangle(300, 80, 400, 30, 0x333333); 
+        this.add.rectangle(980, 80, 400, 30, 0x333333);
+        mordeHpBar = this.add.rectangle(300, 80, 400, 30, 0x00ff00);
+        rigbyHpBar = this.add.rectangle(980, 80, 400, 30, 0x00ff00);
 
-        // Efecto Cartel FIGHT al inicio
+        // Efecto Cartel FIGHT
         let logo = this.add.image(640, 360, 'fight_logo').setScale(0);
         this.tweens.add({
             targets: logo,
-            scale: 1.2,
+            scale: 1,
             duration: 600,
             ease: 'Back.easeOut',
             onComplete: () => {
@@ -99,40 +102,35 @@
             }
         });
 
-        // --- CONTROLES TÁCTILES ---
-        // Flecha Izquierda
-        let btnLeft = this.add.circle(150, 600, 60, 0xffffff, 0.2).setInteractive();
-        btnLeft.on('pointerdown', () => morde.setVelocityX(-400));
+        // Controles táctiles más cómodos para tablet
+        let btnLeft = this.add.circle(120, 600, 60, 0xffffff, 0.2).setInteractive();
+        btnLeft.on('pointerdown', () => morde.setVelocityX(-450));
         btnLeft.on('pointerup', () => morde.setVelocityX(0));
 
-        // Flecha Derecha
-        let btnRight = this.add.circle(300, 600, 60, 0xffffff, 0.2).setInteractive();
-        btnRight.on('pointerdown', () => morde.setVelocityX(400));
+        let btnRight = this.add.circle(280, 600, 60, 0xffffff, 0.2).setInteractive();
+        btnRight.on('pointerdown', () => morde.setVelocityX(450));
         btnRight.on('pointerup', () => morde.setVelocityX(0));
 
-        // Botón de Golpe (A)
-        let hitA = this.add.image(1000, 600, 'btn_a').setScale(1).setInteractive();
+        let hitA = this.add.image(1000, 600, 'btn_a').setScale(0.8).setInteractive();
         hitA.on('pointerdown', () => atacar('normal'));
 
-        // Botón de Golpe Fuerte (X)
-        let hitX = this.add.image(1150, 600, 'btn_x').setScale(1).setInteractive();
+        let hitX = this.add.image(1150, 600, 'btn_x').setScale(0.8).setInteractive();
         hitX.on('pointerdown', () => atacar('fuerte'));
 
         const atacar = (tipo) => {
             if (isGameOver) return;
             morde.setTexture(tipo === 'fuerte' ? 'morde_ataque_fuerte' : 'morde_ataque');
             
-            // Verificamos si están cerca para el golpe
             let distancia = Phaser.Math.Distance.Between(morde.x, morde.y, rigby.x, rigby.y);
-            if (distancia < 200) {
+            if (distancia < 250) {
                 if (tipo === 'fuerte') {
-                    rigbyHp -= 12;
+                    rigbyHp -= 15;
                     sfxHitFuerte.play();
-                    rigby.x += 60; // Knockback
+                    rigby.x += 80;
                 } else {
-                    rigbyHp -= 6;
+                    rigbyHp -= 7;
                     sfxHit.play();
-                    rigby.x += 30;
+                    rigby.x += 40;
                 }
                 rigby.setTexture('rigby_dolor');
                 this.time.delayedCall(300, () => rigby.setTexture('rigby_pose'));
@@ -143,13 +141,12 @@
 
     function update() {
         if (isGameOver) return;
-
-        // Actualizar tamaño de barras
         mordeHpBar.width = mordeHp * 4;
         rigbyHpBar.width = rigbyHp * 4;
 
         if (rigbyHp <= 0) {
             isGameOver = true;
+            rigbyHpBar.width = 0;
             sfxWin.play();
             this.add.text(640, 300, 'MORDECAI WINS', { fontSize: '80px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
         }
