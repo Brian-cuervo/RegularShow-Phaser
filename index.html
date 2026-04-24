@@ -19,139 +19,108 @@
         height: 720,
         backgroundColor: '#000',
         parent: 'game-container',
-        scale: {
-            mode: Phaser.Scale.FIT,
-            autoCenter: Phaser.Scale.CENTER_BOTH
-        },
-        physics: {
-            default: 'arcade',
-            arcade: { gravity: { y: 0 }, debug: false }
-        },
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
         scene: { preload: preload, create: create, update: update }
     };
 
     const game = new Phaser.Game(config);
 
-    let morde, rigby, sfxHit, sfxHitFuerte, sfxFight, sfxWin;
+    let morde, rigby, sfxHit, sfxFight, sfxWin, hud;
     let mordeHp = 100, rigbyHp = 100;
     let mordeHpBar, rigbyHpBar;
     let isGameOver = false;
 
     function preload() {
-        // --- ESCENARIO ---
         this.load.image('bg', 'escenario_parque.png');
         this.load.image('fight_logo', 'cartel_fight.png');
+        this.load.image('hud', 'hud_1.png'); // Cargamos tu HUD
         
-        // --- PERSONAJES (Nombres corregidos de tu repo) ---
+        // Mordecai
         this.load.image('morde_pose', 'mordecai_pose.png');
         this.load.image('morde_ataque', 'mordecai_ataque.png'); 
-        this.load.image('morde_ataque_fuerte', 'mordecai_ataque_fuerte.png');
         this.load.image('morde_dolor', 'mordecai_dolor.png');
         
+        // Rigby
         this.load.image('rigby_pose', 'rigby_pose.png');
         this.load.image('rigby_ataque', 'rigby_ataque.png'); 
         this.load.image('rigby_dolor', 'rigby_dolor.png');
 
-        // --- SONIDOS ---
+        // Sonidos y Botones
         this.load.audio('fight_snd', 'sonido_fight.mp3');
         this.load.audio('hit_snd', 'golpe.mp3');
-        this.load.audio('hit_fuerte_snd', 'golpe_fuerte.mp3');
         this.load.audio('win_snd', 'sonido_win.mp3');
-        
-        // --- BOTONES ---
         this.load.image('btn_a', 'btn_a.png');
         this.load.image('btn_x', 'btn_x.png');
     }
 
     function create() {
-        // Fondo ajustado al tamaño del juego
         this.add.image(640, 360, 'bg').setDisplaySize(1280, 720);
 
-        // Audios
         sfxFight = this.sound.add('fight_snd', { volume: 0.5 });
         sfxHit = this.sound.add('hit_snd', { volume: 0.3 });
-        sfxHitFuerte = this.sound.add('hit_fuerte_snd', { volume: 0.4 });
         sfxWin = this.sound.add('win_snd', { volume: 0.6 });
 
-        // Mordecai - Bajamos escala para que no sea gigante
-        morde = this.physics.add.sprite(300, 550, 'morde_pose').setScale(0.8);
+        morde = this.physics.add.sprite(300, 520, 'morde_pose').setScale(0.45);
         morde.setCollideWorldBounds(true);
         
-        // Rigby - Bajamos escala
-        rigby = this.physics.add.sprite(980, 580, 'rigby_pose').setScale(0.7);
+        rigby = this.physics.add.sprite(980, 550, 'rigby_pose').setScale(0.55);
         rigby.setCollideWorldBounds(true).setFlipX(true);
 
-        // Barras de Vida ajustadas
-        this.add.rectangle(300, 80, 400, 30, 0x333333); 
-        this.add.rectangle(980, 80, 400, 30, 0x333333);
-        mordeHpBar = this.add.rectangle(300, 80, 400, 30, 0x00ff00);
-        rigbyHpBar = this.add.rectangle(980, 80, 400, 30, 0x00ff00);
+        // --- HUD Y BARRAS ---
+        this.add.image(640, 80, 'hud').setScale(0.8); // Tu imagen de HUD arriba
+        mordeHpBar = this.add.rectangle(450, 75, 330, 25, 0x00ff00).setOrigin(1, 0.5);
+        rigbyHpBar = this.add.rectangle(830, 75, 330, 25, 0x00ff00).setOrigin(0, 0.5);
 
-        // Efecto Cartel FIGHT
-        let logo = this.add.image(640, 360, 'fight_logo').setScale(0);
-        this.tweens.add({
-            targets: logo,
-            scale: 1,
-            duration: 600,
-            ease: 'Back.easeOut',
-            onComplete: () => {
-                sfxFight.play();
-                this.time.delayedCall(1000, () => {
-                    this.tweens.add({ targets: logo, alpha: 0, duration: 300 });
-                });
-            }
-        });
+        // Cartel Fight
+        let logo = this.add.image(640, 300, 'fight_logo').setScale(0.8);
+        this.time.delayedCall(1000, () => { sfxFight.play(); logo.destroy(); });
 
-        // Controles táctiles más cómodos para tablet
-        let btnLeft = this.add.circle(120, 600, 60, 0xffffff, 0.2).setInteractive();
-        btnLeft.on('pointerdown', () => morde.setVelocityX(-450));
-        btnLeft.on('pointerup', () => morde.setVelocityX(0));
+        // Controles de ataque
+        let hitA = this.add.image(1050, 600, 'btn_a').setScale(0.7).setInteractive();
+        hitA.on('pointerdown', () => atacar(morde, rigby, 'normal'));
 
-        let btnRight = this.add.circle(280, 600, 60, 0xffffff, 0.2).setInteractive();
-        btnRight.on('pointerdown', () => morde.setVelocityX(450));
-        btnRight.on('pointerup', () => morde.setVelocityX(0));
-
-        let hitA = this.add.image(1000, 600, 'btn_a').setScale(0.8).setInteractive();
-        hitA.on('pointerdown', () => atacar('normal'));
-
-        let hitX = this.add.image(1150, 600, 'btn_x').setScale(0.8).setInteractive();
-        hitX.on('pointerdown', () => atacar('fuerte'));
-
-        const atacar = (tipo) => {
-            if (isGameOver) return;
-            morde.setTexture(tipo === 'fuerte' ? 'morde_ataque_fuerte' : 'morde_ataque');
-            
-            let distancia = Phaser.Math.Distance.Between(morde.x, morde.y, rigby.x, rigby.y);
-            if (distancia < 250) {
-                if (tipo === 'fuerte') {
-                    rigbyHp -= 15;
-                    sfxHitFuerte.play();
-                    rigby.x += 80;
-                } else {
-                    rigbyHp -= 7;
-                    sfxHit.play();
-                    rigby.x += 40;
-                }
-                rigby.setTexture('rigby_dolor');
-                this.time.delayedCall(300, () => rigby.setTexture('rigby_pose'));
-            }
-            this.time.delayedCall(300, () => morde.setTexture('morde_pose'));
-        };
+        // Controles de movimiento táctiles
+        let btnL = this.add.rectangle(150, 600, 200, 200, 0xffffff, 0).setInteractive();
+        let btnR = this.add.rectangle(400, 600, 200, 200, 0xffffff, 0).setInteractive();
+        btnL.on('pointerdown', () => morde.setVelocityX(-400));
+        btnL.on('pointerup', () => morde.setVelocityX(0));
+        btnR.on('pointerdown', () => morde.setVelocityX(400));
+        btnR.on('pointerup', () => morde.setVelocityX(0));
     }
 
     function update() {
         if (isGameOver) return;
-        mordeHpBar.width = mordeHp * 4;
-        rigbyHpBar.width = rigbyHp * 4;
 
-        if (rigbyHp <= 0) {
-            isGameOver = true;
-            rigbyHpBar.width = 0;
-            sfxWin.play();
-            this.add.text(640, 300, 'MORDECAI WINS', { fontSize: '80px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        // IA DE RIGBY: Te persigue lentamente
+        let dist = Phaser.Math.Distance.Between(morde.x, morde.y, rigby.x, rigby.y);
+        
+        if (dist > 150) {
+            this.physics.moveToObject(rigby, morde, 150);
+            rigby.setFlipX(rigby.body.velocity.x < 0);
+        } else {
+            rigby.setVelocity(0);
+            // Probabilidad de que Rigby te ataque si está cerca
+            if (Phaser.Math.Between(0, 100) > 98) atacar(rigby, morde, 'ia');
         }
+
+        mordeHpBar.width = mordeHp * 3.3;
+        rigbyHpBar.width = rigbyHp * 3.3;
+    }
+
+    function atacar(quien, aQuien, tipo) {
+        if (isGameOver) return;
+        quien.setTexture(quien.texture.key.replace('pose', 'ataque'));
+        
+        let dist = Phaser.Math.Distance.Between(quien.x, quien.y, aQuien.x, aQuien.y);
+        if (dist < 200) {
+            sfxHit.play();
+            if (aQuien === rigby) rigbyHp -= 10; else mordeHp -= 5;
+            aQuien.setTexture(aQuien.texture.key.replace('pose', 'dolor'));
+            game.scene.scenes[0].time.delayedCall(200, () => aQuien.setTexture(aQuien.texture.key.replace('dolor', 'pose')));
+        }
+        game.scene.scenes[0].time.delayedCall(300, () => quien.setTexture(quien.texture.key.replace('ataque', 'pose')));
     }
 </script>
-
 </body>
 </html>
