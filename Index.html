@@ -1,1 +1,160 @@
-holaaa
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Un Show Mas - Phaser Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        canvas { display: block; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+<script>
+    const config = {
+        type: Phaser.AUTO,
+        width: 1280, // Resolución fija para que no se deforme
+        height: 720,
+        backgroundColor: '#000',
+        parent: 'game-container',
+        physics: {
+            default: 'arcade',
+            arcade: { gravity: { y: 0 }, debug: false }
+        },
+        scene: { preload: preload, create: create, update: update }
+    };
+
+    const game = new Phaser.Game(config);
+
+    let morde, rigby, sfxHit, sfxHitFuerte, sfxFight, sfxWin;
+    let mordeHp = 100, rigbyHp = 100;
+    let mordeHpBar, rigbyHpBar;
+    let isGameOver = false;
+
+    function preload() {
+        // --- ESCENARIO ---
+        this.load.image('bg', 'escenario_parque.png'); // Asegurate que se llame así
+        this.load.image('fight_logo', 'cartel_fight.png');
+        
+        // --- PERSONAJES (Mordecai) ---
+        this.load.image('morde_pose', 'mordecai_pose.png');
+        this.load.image('morde_ataque', 'mordecai_ataque_1.png'); // Revisar nombre
+        this.load.image('morde_ataque_fuerte', 'mordecai_ataque_fuerte.png');
+        this.load.image('morde_dolor', 'mordecai_dolor.png');
+        
+        // --- PERSONAJES (Rigby) ---
+        this.load.image('rigby_pose', 'rigby_pose.png');
+        this.load.image('rigby_ataque', 'rigby_ataque_1.png'); // Revisar nombre
+        this.load.image('rigby_dolor', 'rigby_dolor.png');
+
+        // --- SONIDOS (Bajamos el volumen como pediste) ---
+        this.load.audio('fight_snd', 'sonido_fight.mp3');
+        this.load.audio('hit_snd', 'golpe.mp3');
+        this.load.audio('hit_fuerte_snd', 'golpe_fuerte.mp3');
+        this.load.audio('win_snd', 'sonido_win.mp3');
+        
+        // --- BOTONES ---
+        this.load.image('btn_a', 'btn_a.png');
+        this.load.image('btn_x', 'btn_x.png');
+    }
+
+    function create() {
+        // Fondo centrado
+        this.add.image(640, 360, 'bg').setDisplaySize(1280, 720);
+
+        // Audios
+        sfxFight = this.sound.add('fight_snd', { volume: 0.5 });
+        sfxHit = this.sound.add('hit_snd', { volume: 0.3 });
+        sfxHitFuerte = this.sound.add('hit_fuerte_snd', { volume: 0.4 });
+        sfxWin = this.sound.add('win_snd', { volume: 0.6 });
+
+        // Mordecai
+        morde = this.physics.add.sprite(300, 500, 'morde_pose').setScale(1.5);
+        morde.setCollideWorldBounds(true);
+        
+        // Rigby
+        rigby = this.physics.add.sprite(980, 500, 'rigby_pose').setScale(1.2);
+        rigby.setCollideWorldBounds(true).setFlipX(true);
+
+        // Barras de Vida (Simples)
+        this.add.rectangle(300, 50, 400, 30, 0x333333); // Fondo barra
+        this.add.rectangle(980, 50, 400, 30, 0x333333);
+        mordeHpBar = this.add.rectangle(300, 50, 400, 30, 0x00ff00);
+        rigbyHpBar = this.add.rectangle(980, 50, 400, 30, 0x00ff00);
+
+        // Efecto Cartel FIGHT al inicio
+        let logo = this.add.image(640, 360, 'fight_logo').setScale(0);
+        this.tweens.add({
+            targets: logo,
+            scale: 1.2,
+            duration: 600,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                sfxFight.play();
+                this.time.delayedCall(1000, () => {
+                    this.tweens.add({ targets: logo, alpha: 0, duration: 300 });
+                });
+            }
+        });
+
+        // --- CONTROLES TÁCTILES ---
+        // Flecha Izquierda
+        let btnLeft = this.add.circle(150, 600, 60, 0xffffff, 0.2).setInteractive();
+        btnLeft.on('pointerdown', () => morde.setVelocityX(-400));
+        btnLeft.on('pointerup', () => morde.setVelocityX(0));
+
+        // Flecha Derecha
+        let btnRight = this.add.circle(300, 600, 60, 0xffffff, 0.2).setInteractive();
+        btnRight.on('pointerdown', () => morde.setVelocityX(400));
+        btnRight.on('pointerup', () => morde.setVelocityX(0));
+
+        // Botón de Golpe (A)
+        let hitA = this.add.image(1000, 600, 'btn_a').setScale(1).setInteractive();
+        hitA.on('pointerdown', () => atacar('normal'));
+
+        // Botón de Golpe Fuerte (X)
+        let hitX = this.add.image(1150, 600, 'btn_x').setScale(1).setInteractive();
+        hitX.on('pointerdown', () => atacar('fuerte'));
+
+        const atacar = (tipo) => {
+            if (isGameOver) return;
+            morde.setTexture(tipo === 'fuerte' ? 'morde_ataque_fuerte' : 'morde_ataque');
+            
+            // Verificamos si están cerca para el golpe
+            let distancia = Phaser.Math.Distance.Between(morde.x, morde.y, rigby.x, rigby.y);
+            if (distancia < 200) {
+                if (tipo === 'fuerte') {
+                    rigbyHp -= 12;
+                    sfxHitFuerte.play();
+                    rigby.x += 60; // Knockback
+                } else {
+                    rigbyHp -= 6;
+                    sfxHit.play();
+                    rigby.x += 30;
+                }
+                rigby.setTexture('rigby_dolor');
+                this.time.delayedCall(300, () => rigby.setTexture('rigby_pose'));
+            }
+            this.time.delayedCall(300, () => morde.setTexture('morde_pose'));
+        };
+    }
+
+    function update() {
+        if (isGameOver) return;
+
+        // Actualizar tamaño de barras
+        mordeHpBar.width = mordeHp * 4;
+        rigbyHpBar.width = rigbyHp * 4;
+
+        if (rigbyHp <= 0) {
+            isGameOver = true;
+            sfxWin.play();
+            this.add.text(640, 300, 'MORDECAI WINS', { fontSize: '80px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        }
+    }
+</script>
+
+</body>
+</html>
